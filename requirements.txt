@@ -1,0 +1,7 @@
+ryu
+flask
+requests
+eventlet==0.30.2
+greenlet<3
+dnspython<2
+six>=1.10.0

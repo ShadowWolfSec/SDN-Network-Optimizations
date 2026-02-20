@@ -1,0 +1,5 @@
+{
+  "admin": {
+    "password": "REPLACE_WITH_HASH"
+  }
+}

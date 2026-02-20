@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <meta name="user-role" content="{{ 'admin' if (session.get('user')|lower == 'admin' or session.get('role') == 'admin') else 'user' }}" />
+  <title>SDN DoS/DDoS Guard - Enterprise Dashboard</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="/static/css/status_banner.css" />
+  <script src="/static/js/vendor/chart.umd.min.js"></script>
+  <!-- Offline-safe: disabled external Google Fonts CDN (https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap) to avoid DNS stalls without internet -->
+</head>
+<body data-user-role="{{ 'admin' if (session.get('user')|lower == 'admin' or session.get('role') == 'admin') else 'user' }}">
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <span>SDN Guard</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav" aria-label="Primary navigation">
+      <button class="nav-item active" data-tab="dashboard" aria-label="Live Dashboard" title="Live Dashboard">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        <span>Live Dashboard</span>
+      </button>
+      <button class="nav-item" data-tab="lab" aria-label="Lab &amp; Attacks" title="Lab &amp; Attacks">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        <span>Lab &amp; Attacks</span>
+      </button>
+      <button class="nav-item" data-tab="forensics" aria-label="Forensics &amp; Flows" title="Forensics &amp; Flows">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <span>Forensics &amp; Flows</span>
+      </button>
+      <button class="nav-item" data-tab="settings" aria-label="Settings" title="Settings">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <span class="user-name">{{ session.get('user', 'Admin') }}</span>
+        <span class="user-role-badge role-{{ 'admin' if (session.get('user')|lower == 'admin' or session.get('role') == 'admin') else 'user' }}">{{ ('admin' if (session.get('user')|lower == 'admin' or session.get('role') == 'admin') else 'user')|upper }}</span>
+        <form method="post" action="/logout" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit" class="logout-btn">Logout</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Header -->
+    <header class="top-bar">
+      <div class="page-title">
+        <h1 id="page-title">Live Dashboard</h1>
+        <p id="page-subtitle">Real-time network monitoring and threat detection</p>
+      </div>
+      <div class="status-indicators">
+        <div class="status-item">
+          <span class="status-label">Ryu API</span>
+          <span id="ryu-status" class="status-badge unknown">Unknown</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Lab</span>
+          <span id="lab-status" class="status-badge unknown">Unknown</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Global System Stability & State Live Banner -->
+    <div id="system-status-banner" class="system-status-banner state-idle">
+      <div class="banner-left">
+        <span class="banner-pulse"></span>
+        <span class="banner-badge" id="banner-state-badge">IDLE</span>
+        <span class="banner-message" id="banner-message">System ready (Idle)</span>
+      </div>
+      <div class="banner-right">
+        <span class="banner-op-container" id="banner-op-container" style="display:none;">
+          <span class="banner-spinner"></span>
+          <span class="banner-op-label">Operation: <strong id="banner-op">-</strong></span>
+        </span>
+        <span class="banner-timer" id="banner-timer" style="display:none;">Elapsed: <strong id="banner-elapsed">0s</strong></span>
+      </div>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Dashboard Tab -->
+      <div id="tab-dashboard" class="tab-pane active">
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Datapaths</span>
+              <svg class="metric-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+              </svg>
+            </div>
+            <div id="dp-count" class="metric-value">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">PacketIns</span>
+              <svg class="metric-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+            </div>
+            <div id="pktins" class="metric-value">-</div>
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Packets forwarded to Controller</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Blocked IPs</span>
+              <svg class="metric-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+            </div>
+            <div id="blocked-count" class="metric-value">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Total Flows</span>
+              <svg class="metric-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3h18v18H3zM9 9h6M9 13h6M9 17h6"/>
+              </svg>
+            </div>
+            <div id="flows-total" class="metric-value">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Drop Flows</span>
+              <svg class="metric-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </div>
+            <div id="flows-drop" class="metric-value">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">PPS Threshold</span>
+              <svg class="metric-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </div>
+            <div id="thresh" class="metric-value">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Alpha (EWMA)</span>
+              <svg class="metric-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v20M2 12h20"/>
+              </svg>
+            </div>
+            <div id="alpha" class="metric-value">-</div>
+          </div>
+        </div>
+
+        <!-- Status Indicators -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Mininet Lab</span>
+            </div>
+            <div id="lab-status-card" class="metric-value" style="font-size: 16px;">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Mitigation</span>
+            </div>
+            <div id="mitigation-status" class="metric-value" style="font-size: 16px;">-</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Auto Failover</span>
+            </div>
+            <div id="auto-failover-status" class="metric-value" style="font-size: 16px;">-</div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>Live Traffic Rate</h3>
+            <canvas id="chart-live" height="200"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Top PPS Sources</h3>
+            <canvas id="chart-pps" height="200"></canvas>
+          </div>
+        </div>
+
+        <!-- Additional Charts -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>SYN Flood Detection</h3>
+            <canvas id="chart-syn" height="200"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>UDP Flood Detection</h3>
+            <canvas id="chart-udp" height="200"></canvas>
+          </div>
+        </div>
+
+        <!-- Blocked IPs List -->
+        <div class="alerts-section">
+          <div class="section-header">
+            <h3>Blocked IPs</h3>
+            <button id="btn-unblock-all" class="btn-secondary">Unblock All</button>
+          </div>
+          <div id="blocked-list" class="pill-list"></div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div class="alerts-section">
+          <div class="section-header">
+            <h3>Recent Alerts</h3>
+            <button id="btn-clear-alerts" class="btn-secondary">Clear Alerts</button>
+          </div>
+          <ul id="alerts" class="alerts-list"></ul>
+        </div>
+      </div>
+
+      <!-- Lab Tab -->
+      <div id="tab-lab" class="tab-pane">
+        <div class="lab-controls">
+          <div class="control-card">
+            <h3>Network Topology</h3>
+            <div class="button-group">
+              <button id="btn-lab-build" class="btn-primary">Build Network</button>
+              <button id="btn-lab-apply-live" class="btn-secondary">Apply Live Changes</button>
+              <button id="btn-lab-stop" class="btn-danger">Stop Network</button>
+            </div>
+            <div class="form-row">
+              <label class="sr-only" for="controller-ip">Controller IP</label>
+              <input id="controller-ip" type="text" placeholder="Controller IP" value="127.0.0.1" />
+              <label class="sr-only" for="controller-port">Controller Port</label>
+              <input id="controller-port" type="number" placeholder="Port" value="6653" />
+            </div>
+            <div id="lab-msg" class="msg"></div>
+          </div>
+
+          <div class="control-card">
+            <h3>Attack Scenarios</h3>
+            <div class="form-row">
+              <label class="sr-only" for="scenario-name">Attack scenario preset</label>
+              <select id="scenario-name">
+                <option value="demo_normal">Normal Traffic</option>
+                <option value="demo_dos">DoS (Single Attacker)</option>
+                <option value="demo_ddos_medium">DDoS Medium</option>
+                <option value="demo_ddos_massive">DDoS Massive</option>
+                <option value="syn_flood">SYN Flood</option>
+                <option value="udp_flood">UDP Flood</option>
+                <option value="portscan">Portscan</option>
+                <option value="icmp_flood">ICMP Flood</option>
+              </select>
+            </div>
+            <div id="scenario-requirements" class="msg" style="margin: 4px 0 8px 0; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-secondary); font-size: 11px; color: var(--text-secondary);"></div>
+            <div class="form-row">
+              <span id="scenario-attackers-label" style="color: var(--text-secondary); font-size: 12px;">Attackers (Eligible Clients Only):</span>
+              <div id="scenario-attackers" role="group" aria-labelledby="scenario-attackers-label" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">
+                <span style="color: var(--text-muted); font-size: 11px;">Waiting for lab startup...</span>
+              </div>
+              <div id="scenario-hosts-note" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;"></div>
+            </div>
+            <div class="form-row">
+              <label class="sr-only" for="scenario-victim">Target victim host</label>
+              <select id="scenario-victim">
+                <option value="">Victim (Select Target)</option>
+              </select>
+              <label class="sr-only" for="scenario-proto">Attack protocol</label>
+              <select id="scenario-proto" title="Attack protocol for preset scenarios">
+                <option value="syn">TCP (SYN)</option>
+                <option value="udp">UDP</option>
+              </select>
+              <label class="sr-only" for="scenario-duration">Attack duration in seconds</label>
+              <input id="scenario-duration" type="number" min="1" value="20" placeholder="Duration (s)" title="Attack duration in seconds" />
+            </div>
+            <div class="button-group">
+              <button id="btn-scenario-run" class="btn-warning">Run Attack</button>
+              <button id="btn-scenario-stop" class="btn-danger">Stop Attack</button>
+            </div>
+            <label class="checkbox-label" for="scenario-capture">
+              <input id="scenario-capture" type="checkbox" />
+              <span>Capture PCAP</span>
+            </label>
+            <div id="scenario-msg" class="msg"></div>
+            <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">
+              Make sure to build and start the network first (Build Network).
+            </div>
+          </div>
+
+          <div class="control-card">
+            <h3>Demo Mode</h3>
+            <div class="button-group">
+              <button id="btn-demo-run" class="btn-primary">Run Full Demo</button>
+              <button id="btn-demo-stop" class="btn-danger" disabled>Stop Demo</button>
+            </div>
+            <div class="demo-note">
+              Browser-coordinated sequence (closing or reloading this tab stops remaining client steps; active step traffic ends automatically on the server after its duration).
+            </div>
+            <div id="demo-msg" class="msg" role="status" aria-live="polite"></div>
+          </div>
+
+          <div class="control-card">
+            <h3>Attack Status</h3>
+            <div style="margin-bottom: 8px; font-size: 11px; color: var(--text-muted);">
+              Live attack status — refreshes automatically every 2 seconds
+            </div>
+            <div class="attack-status-grid">
+              <div class="status-field">
+                <span class="field-label">Status</span>
+                <span id="attack-running" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Type</span>
+                <span id="attack-kind" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Profile</span>
+                <span id="attack-profile" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Attackers</span>
+                <span id="attack-attackers" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Legitimate</span>
+                <span id="attack-legit" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Elapsed</span>
+                <span id="attack-elapsed" class="field-value">-</span>
+              </div>
+            </div>
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+              <div class="status-field">
+                <span class="field-label">Victim Host</span>
+                <span id="attack-victim" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Victim IP</span>
+                <span id="attack-victim-ip" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Attacker IPs</span>
+                <span id="attack-attacker-ips" class="field-value">-</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-card">
+            <h3>Controller Controls</h3>
+            <div class="button-group">
+              <button id="btn-controller-start" class="btn-success">Start Controller</button>
+              <button id="btn-controller-stop" class="btn-danger">Stop Controller</button>
+            </div>
+            <div class="button-group">
+              <button id="btn-controller-restart-no-learning" class="btn-warning">Restart (No Learning)</button>
+            </div>
+            <div class="button-group">
+              <button id="btn-flows-clear" class="btn-secondary">Clear Flows</button>
+            </div>
+            <div class="control-row">
+              <span class="field-label">Status</span>
+              <span id="controller-status" class="field-value">-</span>
+            </div>
+            <div class="readiness-matrix" style="margin: 8px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px;">
+              <div style="background: var(--bg-secondary); padding: 4px 8px; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                <span>1. Process</span>
+                <span id="stage-process" class="badge badge-secondary">-</span>
+              </div>
+              <div style="background: var(--bg-secondary); padding: 4px 8px; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                <span>2. REST API</span>
+                <span id="stage-rest" class="badge badge-secondary">-</span>
+              </div>
+              <div style="background: var(--bg-secondary); padding: 4px 8px; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                <span>3. OFP Port</span>
+                <span id="stage-ofp" class="badge badge-secondary">-</span>
+              </div>
+              <div style="background: var(--bg-secondary); padding: 4px 8px; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                <span>4. Datapaths</span>
+                <span id="stage-datapath" class="badge badge-secondary">-</span>
+              </div>
+            </div>
+            <div class="control-row">
+              <span class="field-label">Learning Mode</span>
+              <span id="learning-status" class="field-value">-</span>
+            </div>
+            <label class="checkbox-label" for="learning-toggle">
+              <input id="learning-toggle" type="checkbox" checked />
+              <span>Toggle Learning Mode</span>
+            </label>
+            <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">
+              If PacketIns remains 0: click "Clear Flows" then "Restart (No Learning)".
+            </div>
+            <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+              Learning Mode = OFF: every packet reaches the controller for inspection and detection.
+            </div>
+            <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+              Learning Mode = ON: learned flows bypass the controller for higher throughput.
+            </div>
+            <pre id="controller-log" style="margin-top: 12px; font-size: 11px; max-height: 120px; overflow-y: auto; background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 8px;"></pre>
+          </div>
+
+          <div class="control-card">
+            <h3>HA Demo</h3>
+            <div class="button-group">
+              <button id="btn-ha-start" class="btn-primary">Start HA</button>
+              <button id="btn-ha-stop" class="btn-danger">Stop HA</button>
+              <button id="btn-ha-primary" class="btn-secondary">Set Primary</button>
+              <button id="btn-ha-backup" class="btn-secondary">Set Backup</button>
+              <button id="btn-ha-test" class="btn-secondary">Test Failover</button>
+            </div>
+            <div class="attack-status-grid">
+              <div class="status-field">
+                <span class="field-label">Active</span>
+                <span id="ha-active" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">VIP</span>
+                <span id="ha-vip" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Health</span>
+                <span id="ha-health" class="field-value">-</span>
+              </div>
+            </div>
+            <div id="ha-msg" class="msg"></div>
+          </div>
+
+          <div class="control-card">
+            <h3>Command Console</h3>
+            <div class="form-row cmd-controls-row">
+              <label class="sr-only" for="cmd-type">Command type</label>
+              <select id="cmd-type">
+                <option value="ping" selected>Ping</option>
+                <option value="iperf_tcp">iPerf TCP</option>
+                <option value="iperf_udp">iPerf UDP</option>
+                <option value="ovs_dump_flows">OVS Dump Flows</option>
+              </select>
+              <label class="sr-only" for="cmd-src">Source host or IP</label>
+              <input id="cmd-src" type="text" placeholder="Source (e.g., h1 or 10.0.0.1)" value="h1" />
+              <label class="sr-only" for="cmd-dst">Destination IP or host</label>
+              <input id="cmd-dst" type="text" placeholder="Destination (e.g., 10.0.0.2 or h2)" />
+              <label class="sr-only" for="cmd-server">iPerf server host or IP</label>
+              <input id="cmd-server" type="text" placeholder="Server (e.g., h2 or 10.0.0.2)" value="h2" />
+              <label class="sr-only" for="cmd-duration">Command duration in seconds</label>
+              <input id="cmd-duration" type="number" placeholder="Duration (s)" value="5" min="1" max="30" />
+              <label class="sr-only" for="cmd-switch">Switch name</label>
+              <input id="cmd-switch" type="text" placeholder="Switch (e.g., s1)" value="s1" />
+            </div>
+            <button id="btn-cmd-run" class="btn-primary">Run Command</button>
+            <div id="cmd-msg" class="msg"></div>
+            <pre id="cmd-out" class="code-block"></pre>
+          </div>
+
+          <div class="control-card">
+            <div class="section-header">
+              <h3>PCAP Captures</h3>
+              <div class="header-actions">
+                <span id="pcap-storage-summary" class="storage-badge" title="Storage Quota Usage"></span>
+                <button id="btn-pcap-refresh" class="btn-secondary">Refresh</button>
+              </div>
+            </div>
+            <div id="pcap-status" class="msg"></div>
+            <div id="pcap-list" class="pcap-container"></div>
+          </div>
+        </div>
+
+        <!-- Topology Canvas -->
+        <div class="topology-section">
+          <div class="section-header">
+            <h3>Topology Designer</h3>
+            <div class="toolbar" role="toolbar" aria-label="Topology editor tools">
+              <button id="tool-select" class="tool-btn active" aria-pressed="true">Select</button>
+              <button id="tool-add-switch" class="tool-btn" aria-pressed="false">Add Switch</button>
+              <button id="tool-add-host" class="tool-btn" aria-pressed="false">Add Host</button>
+              <button id="tool-link" class="tool-btn" aria-pressed="false">Link</button>
+              <button id="tool-delete" class="tool-btn" aria-pressed="false">Delete</button>
+              <button id="btn-topo-save" class="tool-btn">Save</button>
+              <button id="btn-topo-load" class="tool-btn">Load</button>
+              <button id="btn-topo-export" class="tool-btn">Export</button>
+              <button id="btn-topo-import" class="tool-btn">Import</button>
+              <button id="btn-topo-layout" class="tool-btn">Auto Layout</button>
+              <button id="btn-topo-reset" class="tool-btn">Reset Default</button>
+            </div>
+          </div>
+          <canvas id="topology-canvas" width="1200" height="500"></canvas>
+          <div class="form-row" style="margin-top: 16px;">
+            <label class="sr-only" for="link-bw">Link bandwidth in Mbps</label>
+            <input id="link-bw" type="number" placeholder="Bandwidth (Mbps)" />
+            <label class="sr-only" for="link-delay">Link delay in milliseconds</label>
+            <input id="link-delay" type="number" placeholder="Delay (ms)" />
+            <label class="sr-only" for="link-loss">Link packet loss percentage</label>
+            <input id="link-loss" type="number" placeholder="Loss (%)" step="0.1" />
+            <button id="btn-link-apply" class="btn-primary">Apply Link Config</button>
+          </div>
+          <div id="link-msg" class="msg"></div>
+          <div style="margin-top: 16px;">
+            <label class="sr-only" for="topology-json">Topology JSON configuration</label>
+            <textarea id="topology-json" placeholder="Topology JSON..." style="width: 100%; height: 100px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); padding: 8px; font-family: monospace; font-size: 12px;"></textarea>
+            <button id="btn-topo-apply-import" class="btn-secondary" style="margin-top: 8px;">Apply Import</button>
+            <div id="topo-msg" class="msg"></div>
+            <div id="selected-item" class="msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forensics Tab -->
+      <div id="tab-forensics" class="tab-pane">
+        <div class="forensics-grid">
+          <div class="detail-card">
+            <div class="section-header">
+              <h3>Flow Statistics</h3>
+              <button id="btn-flows-refresh" class="btn-secondary">Refresh</button>
+            </div>
+            <pre id="flow-stats" class="code-block"></pre>
+          </div>
+          <div class="detail-card">
+            <div class="section-header">
+              <h3>Attack History</h3>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <button id="btn-history-refresh" class="btn-secondary">Refresh</button>
+                <a id="history-csv" href="/api/history.csv" target="_blank" class="btn-link">Download CSV</a>
+              </div>
+            </div>
+            <div id="history-msg" class="msg"></div>
+            <pre id="history-view" class="code-block"></pre>
+          </div>
+          <div class="detail-card">
+            <div class="section-header">
+              <h3>OVS Switch Flows</h3>
+              <button id="btn-ovs-refresh" class="btn-secondary">Refresh OVS</button>
+            </div>
+            <div id="ovs-msg" class="msg"></div>
+            <div id="ovs-flows"></div>
+          </div>
+          <div class="detail-card">
+            <div class="section-header">
+              <h3>Blocked IPs Details</h3>
+            </div>
+            <pre id="blocked-info" class="code-block"></pre>
+          </div>
+          <div class="detail-card">
+            <div class="section-header">
+              <h3>Recent Packets</h3>
+            </div>
+            <pre id="last-packets" class="code-block"></pre>
+          </div>
+          <div class="detail-card">
+            <div class="section-header">
+              <h3>Port Statistics</h3>
+            </div>
+            <pre id="port-stats" class="code-block"></pre>
+          </div>
+          <div class="detail-card">
+            <div class="section-header">
+              <h3>MAC Table</h3>
+            </div>
+            <pre id="mac-table" class="code-block"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div id="tab-settings" class="tab-pane">
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h3>Detection Thresholds</h3>
+            <form id="form-config">
+              <div class="form-group">
+                <label for="cfg-threshold-pps">PPS Threshold</label>
+                <input id="cfg-threshold-pps" name="threshold_pps" type="number" step="1" min="1" placeholder="300" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-alpha">EWMA Alpha</label>
+                <input id="cfg-alpha" name="alpha" type="number" step="0.05" min="0.05" max="0.95" placeholder="0.3" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-measure-interval">Measure Interval (s)</label>
+                <input id="cfg-measure-interval" name="measure_interval" type="number" step="0.1" min="0.1" placeholder="1.0" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-syn-threshold">SYN Threshold (pps)</label>
+                <input id="cfg-syn-threshold" name="syn_threshold" type="number" step="1" min="1" placeholder="200" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-udp-threshold">UDP Threshold (pps)</label>
+                <input id="cfg-udp-threshold" name="udp_threshold" type="number" step="1" min="1" placeholder="400" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-portscan-threshold">Portscan Threshold (ports)</label>
+                <input id="cfg-portscan-threshold" name="portscan_threshold" type="number" step="1" min="1" placeholder="50" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-ddos-source-threshold">DDoS Source Threshold</label>
+                <input id="cfg-ddos-source-threshold" name="ddos_source_threshold" type="number" step="1" min="1" placeholder="4" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-ddos-min-pps">DDoS Min PPS Per Source</label>
+                <input id="cfg-ddos-min-pps" name="ddos_min_pps_per_source" type="number" step="1" min="1" placeholder="30" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-block-duration">Block Duration (s, 0=permanent)</label>
+                <input id="cfg-block-duration" name="block_duration_sec" type="number" step="1" min="0" placeholder="120" />
+              </div>
+              <div class="form-group">
+                <label for="cfg-drop-priority">Drop Priority</label>
+                <input id="cfg-drop-priority" name="drop_priority" type="number" step="1" min="0" placeholder="0" />
+              </div>
+              <div class="button-group" style="display: flex; gap: 8px; margin-top: 12px;">
+                <button type="button" id="btn-config-ephemeral" class="btn-primary" style="flex: 1;">Apply Live (Ephemeral)</button>
+                <button type="button" id="btn-config-permanent" class="btn-warning" style="flex: 1;">Save &amp; Apply (Permanent)</button>
+              </div>
+            </form>
+            <div id="config-msg" class="msg"></div>
+          </div>
+
+          <div class="settings-card">
+            <h3>IP Blocking</h3>
+            <form id="form-block" class="inline-form">
+              <label class="sr-only" for="block-ip-input">IP address to block</label>
+              <input id="block-ip-input" name="ip" type="text" placeholder="IP address (e.g., 10.0.0.1)" />
+              <button type="submit" class="btn-danger">Block IP</button>
+            </form>
+            <form id="form-unblock" class="inline-form">
+              <label class="sr-only" for="unblock-ip-input">IP address to unblock</label>
+              <input id="unblock-ip-input" name="ip" type="text" placeholder="IP address" />
+              <button type="submit" class="btn-secondary">Unblock IP</button>
+            </form>
+            <div id="blocked-list-settings" class="pill-list"></div>
+            <button id="btn-unblock-all-settings" class="btn-secondary">Unblock All</button>
+          </div>
+
+          <div class="settings-card">
+            <h3>MAC Blocking</h3>
+            <form id="form-block-mac" class="inline-form">
+              <label class="sr-only" for="block-mac-input">MAC address to block</label>
+              <input id="block-mac-input" name="mac" type="text" placeholder="MAC address (e.g., 00:00:00:00:00:01)" />
+              <button type="submit" class="btn-danger">Block MAC</button>
+            </form>
+            <form id="form-unblock-mac" class="inline-form">
+              <label class="sr-only" for="unblock-mac-input">MAC address to unblock</label>
+              <input id="unblock-mac-input" name="mac" type="text" placeholder="MAC address" />
+              <button type="submit" class="btn-secondary">Unblock MAC</button>
+            </form>
+            <div id="blocked-macs-list" class="pill-list"></div>
+            <button id="btn-unblock-mac-all" class="btn-secondary">Unblock All MACs</button>
+          </div>
+
+          <div class="settings-card">
+            <h3>IP Whitelist</h3>
+            <div class="control-row" style="margin-bottom: 8px;">
+              <span class="field-label">Persistence Status</span>
+              <span id="whitelist-sync-status" class="status-pill status-muted">Unknown</span>
+            </div>
+            <form id="form-whitelist" class="inline-form">
+              <label class="sr-only" for="whitelist-ip-input">IP address to whitelist</label>
+              <input id="whitelist-ip-input" name="ip" type="text" placeholder="IP address to whitelist" />
+              <button type="submit" class="btn-success">Add to Whitelist</button>
+            </form>
+            <form id="form-unwhitelist" class="inline-form">
+              <label class="sr-only" for="unwhitelist-ip-input">IP address to remove from whitelist</label>
+              <input id="unwhitelist-ip-input" name="ip" type="text" placeholder="IP address" />
+              <button type="submit" class="btn-secondary">Remove from Whitelist</button>
+            </form>
+            <div id="whitelist-list" class="pill-list"></div>
+            <div class="button-group" style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+              <button id="btn-save-whitelist" class="btn-primary" title="Save current in-memory whitelist to disk">Save to Disk</button>
+              <button id="btn-restore-whitelist" class="btn-secondary" title="Restore whitelist from disk into active memory">Restore from Disk</button>
+              <button id="btn-delete-whitelist-file" class="btn-danger" title="Delete persistent whitelist file from disk">Delete Saved File</button>
+              <button id="btn-clear-whitelist" class="btn-secondary">Clear Memory</button>
+            </div>
+            <div id="whitelist-msg" class="msg"></div>
+          </div>
+
+          <div class="settings-card">
+            <h3>API Configuration</h3>
+            <div class="control-row">
+              <span class="field-label">Ryu API Base</span>
+              <span id="ryu-base">-</span>
+            </div>
+            <form id="form-save-base" class="inline-form">
+              <label class="sr-only" for="ryu-base-input">Ryu API Base URL</label>
+              <input id="ryu-base-input" type="text" placeholder="http://127.0.0.1:8080" />
+              <button id="btn-save-base" type="submit" class="btn-primary">Save</button>
+            </form>
+          </div>
+
+          <div class="settings-card">
+            <h3>Mitigation Controls</h3>
+            <div class="control-row">
+              <span class="field-label">Mitigation</span>
+              <span id="mitigation-status-settings" class="field-value">-</span>
+              <button id="btn-mitigation-toggle" class="btn-secondary" aria-label="Toggle automatic mitigation">Toggle</button>
+            </div>
+            <div class="control-row">
+              <span class="field-label">Auto Failover</span>
+              <span id="auto-failover-status-settings" class="field-value">-</span>
+              <button id="btn-auto-failover-toggle" class="btn-secondary" aria-label="Toggle automatic HA failover">Toggle</button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>VM Metrics</h3>
+            <div class="attack-status-grid">
+              <div class="status-field">
+                <span class="field-label">CPU</span>
+                <span id="vm-cpu" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Memory</span>
+                <span id="vm-mem" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Load</span>
+                <span id="vm-load" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Disk</span>
+                <span id="vm-disk" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Network</span>
+                <span id="vm-net" class="field-value">-</span>
+              </div>
+            </div>
+            <div id="vm-msg" class="msg"></div>
+          </div>
+
+          <div class="settings-card">
+            <h3>Process Metrics</h3>
+            <div class="attack-status-grid">
+              <div class="status-field">
+                <span class="field-label">Ryu CPU</span>
+                <span id="proc-ryu-cpu" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Ryu Memory</span>
+                <span id="proc-ryu-mem" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">Ryu Threads</span>
+                <span id="proc-ryu-th" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">OVS CPU</span>
+                <span id="proc-ovs-cpu" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">OVS Memory</span>
+                <span id="proc-ovs-mem" class="field-value">-</span>
+              </div>
+              <div class="status-field">
+                <span class="field-label">OVS Switches</span>
+                <span id="proc-ovs-n" class="field-value">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/static/js/modules/utils.js?v=2"></script>
+  <script src="/static/js/modules/charts.js?v=2"></script>
+  <script src="/static/js/modules/telemetry.js?v=1"></script>
+  <script src="/static/js/modules/forensics.js?v=1"></script>
+  <script src="/static/js/modules/cmd_ha.js?v=1"></script>
+  <script src="/static/js/modules/controller_controls.js?v=1"></script>
+  <script src="/static/js/modules/ovs_flows.js?v=1"></script>
+  <script src="/static/js/modules/settings_manager.js?v=1"></script>
+  <script src="/static/js/modules/navigation.js?v=2"></script>
+  <script src="/static/js/modules/topology_canvas.js?v=1"></script>
+  <script src="/static/js/modules/lab_orchestrator.js?v=1"></script>
+  <script src="/static/js/app.js?v=15"></script>
+</body>
+</html>

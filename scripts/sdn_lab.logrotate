@@ -1,0 +1,15 @@
+# /etc/logrotate.d/sdn-lab
+# System-level log rotation policy for SDN Lab Services
+# Copy to /etc/logrotate.d/sdn-lab and set ownership to root:root 0644
+
+/home/ubuntu/sdn-ddos-mitigation-ha/logs/*.log {
+    daily
+    missingok
+    rotate 5
+    size 10M
+    copytruncate
+    compress
+    delaycompress
+    notifempty
+    create 0644 ubuntu ubuntu
+}

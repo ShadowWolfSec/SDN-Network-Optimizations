@@ -1,0 +1,78 @@
+# ==============================================================================
+# Git Ignore Rules for sdn-ddos-mitigation-ha
+# ==============================================================================
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Quality Assurance Cache
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Ephemeral Runtime State & Security Tokens
+.run/
+*.token
+*.secret
+*.pid
+*.ok
+*.fix.applied
+*.lock
+configs/.sdn_whitelist.lock
+configs/.f20_rollback_manifest
+
+# Logs and Forensic Packet Captures (PCAP)
+logs/
+*.log
+*.pcap
+*.cap
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE & Editor Configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
